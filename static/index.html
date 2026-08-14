@@ -1,0 +1,231 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>TempShare</title>
+<style>
+  :root {
+    --bg: #0f1117; --panel: #171a23; --border: #262b38;
+    --text: #e6e8ef; --muted: #8b93a7; --accent: #5b8def; --danger: #e5484d;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font-family: -apple-system, Segoe UI, Roboto, sans-serif; }
+  .wrap { max-width: 880px; margin: 0 auto; padding: 32px 20px 80px; }
+  h1 { font-size: 22px; margin-bottom: 4px; }
+  .sub { color: var(--muted); margin-bottom: 24px; font-size: 14px; }
+  .status { padding:10px 12px; border-radius:8px; margin-bottom:16px; font-size:13px; background:#262b38; }
+  .status.connected { background:#103d24; color:#86efac; }
+  .status.failed { background:#3d1010; color:#fca5a5; }
+  .drop {
+    border: 2px dashed var(--border); border-radius: 12px; padding: 40px 20px;
+    text-align: center; color: var(--muted); cursor: pointer; transition: border-color .15s;
+  }
+  .drop.drag { border-color: var(--accent); color: var(--text); }
+  .panel { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 20px; margin-top: 16px; }
+  .row { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 12px; }
+  .field { flex: 1; min-width: 140px; }
+  label { display: block; font-size: 12px; color: var(--muted); margin-bottom: 6px; }
+  select, input { width: 100%; background: #10131b; border: 1px solid var(--border); color: var(--text); padding: 8px 10px; border-radius: 8px; font-size: 14px; }
+  button { background: var(--accent); color: white; border: none; padding: 10px 16px; border-radius: 8px; cursor: pointer; font-size: 14px; font-weight: 600; }
+  button.secondary { background: #262b38; }
+  button.danger { background: var(--danger); }
+  button:disabled { opacity: .5; cursor: not-allowed; }
+  .link-box { display: flex; gap: 8px; margin-top: 14px; }
+  .link-box input { font-family: monospace; }
+  table { width: 100%; border-collapse: collapse; margin-top: 12px; font-size: 13px; }
+  th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--border); }
+  th { color: var(--muted); font-weight: 500; font-size: 12px; }
+  .badge { padding: 2px 8px; border-radius: 20px; font-size: 11px; }
+  .badge.active { background: #103d24; color: #4ade80; }
+  .badge.revoked { background: #3d1010; color: #f87171; }
+  .actions button { padding: 5px 10px; font-size: 12px; margin-right: 6px; }
+  #toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: #1e2230; border: 1px solid var(--border); padding: 10px 18px; border-radius: 8px; display: none; }
+  .pick-buttons { display:flex; justify-content:center; gap:10px; margin-top:14px; }
+  #qrCode { background:white; padding:10px; width:max-content; margin-top:14px; border-radius:8px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>TempShare</h1>
+  <div class="sub">Your files stay on this computer and stream only when someone downloads them.</div>
+  <div id="tunnelStatus" class="status">Preparing secure public link…</div>
+
+  <div id="drop" class="drop">
+    <div>Drag & drop files here, or choose what to share</div>
+    <div class="pick-buttons">
+      <button type="button" id="pickFileBtn">Choose file</button>
+      <button type="button" class="secondary" id="pickFolderBtn">Choose folder</button>
+    </div>
+    <input id="fileInput" type="file" style="display:none" />
+    <input id="folderInput" type="file" webkitdirectory multiple style="display:none" />
+  </div>
+
+  <div class="panel" id="optionsPanel" style="display:none">
+    <div id="selectedFileName" style="font-weight:600"></div>
+    <div class="row">
+      <div class="field">
+        <label>Expires</label>
+        <select id="expires">
+          <option value="1h">1 hour</option>
+          <option value="24h" selected>24 hours</option>
+          <option value="7d">7 days</option>
+          <option value="30d">30 days</option>
+          <option value="never">Never</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>Max downloads</label>
+        <select id="maxDownloads">
+          <option value="1">1</option>
+          <option value="5">5</option>
+          <option value="10">10</option>
+          <option value="unlimited" selected>Unlimited</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>Password (optional)</label>
+        <input id="password" type="password" placeholder="Leave blank for none" />
+      </div>
+    </div>
+    <div class="row">
+      <button id="createBtn">Create share link</button>
+      <button class="secondary" id="cancelBtn">Cancel</button>
+    </div>
+    <div class="link-box" id="linkBox" style="display:none">
+      <input id="linkOutput" readonly />
+      <button id="copyBtn">Copy</button>
+    </div>
+    <div id="qrCode" style="display:none"></div>
+  </div>
+
+  <div class="panel">
+    <div style="display:flex; justify-content:space-between; align-items:center">
+      <strong>Active shares</strong>
+      <button class="secondary" id="refreshBtn">Refresh</button>
+    </div>
+    <table>
+      <thead>
+        <tr><th>Name</th><th>Size</th><th>Expires</th><th>Downloads</th><th>Status</th><th></th></tr>
+      </thead>
+      <tbody id="sharesTbody"></tbody>
+    </table>
+  </div>
+</div>
+<div id="toast"></div>
+
+<script src="/qrcode.min.js"></script>
+<script type="text/plain">
+const dropEl = document.getElementById('drop');
+const fileInput = document.getElementById('fileInput');
+const optionsPanel = document.getElementById('optionsPanel');
+const selectedFileName = document.getElementById('selectedFileName');
+let selectedFile = null;
+
+function toast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.style.display = 'block';
+  setTimeout(() => t.style.display = 'none', 2500);
+}
+
+function humanSize(bytes) {
+  const u = ['B','KB','MB','GB','TB']; let i = 0; let n = bytes;
+  while (n >= 1024 && i < u.length - 1) { n /= 1024; i++; }
+  return n.toFixed(n < 10 && i > 0 ? 1 : 0) + ' ' + u[i];
+}
+
+function pickFile(file) {
+  selectedFile = file;
+  selectedFileName.textContent = file.name + ' — ' + humanSize(file.size);
+  optionsPanel.style.display = 'block';
+  document.getElementById('linkBox').style.display = 'none';
+}
+
+dropEl.addEventListener('click', () => fileInput.click());
+fileInput.addEventListener('change', e => { if (e.target.files[0]) pickFile(e.target.files[0]); });
+['dragenter','dragover'].forEach(ev => dropEl.addEventListener(ev, e => { e.preventDefault(); dropEl.classList.add('drag'); }));
+['dragleave','drop'].forEach(ev => dropEl.addEventListener(ev, e => { e.preventDefault(); dropEl.classList.remove('drag'); }));
+dropEl.addEventListener('drop', e => { const f = e.dataTransfer.files[0]; if (f) pickFile(f); });
+
+document.getElementById('cancelBtn').onclick = () => {
+  selectedFile = null; optionsPanel.style.display = 'none'; fileInput.value = '';
+};
+
+document.getElementById('createBtn').onclick = async () => {
+  if (!selectedFile) return;
+  const btn = document.getElementById('createBtn');
+  btn.disabled = true; btn.textContent = 'Uploading…';
+
+  const fd = new FormData();
+  fd.append('file', selectedFile);
+  fd.append('expires', document.getElementById('expires').value);
+  fd.append('max_downloads', document.getElementById('maxDownloads').value);
+  fd.append('password', document.getElementById('password').value);
+
+  try {
+    const res = await fetch('/api/shares', { method: 'POST', body: fd });
+    if (!res.ok) { const j = await res.json().catch(()=>({})); throw new Error(j.error || 'upload failed'); }
+    const data = await res.json();
+    const url = window.location.origin + data.download_url;
+    const box = document.getElementById('linkBox');
+    document.getElementById('linkOutput').value = url;
+    box.style.display = 'flex';
+    toast('Share created');
+    loadShares();
+  } catch (e) {
+    toast('Error: ' + e.message);
+  } finally {
+    btn.disabled = false; btn.textContent = 'Create share link';
+  }
+};
+
+document.getElementById('copyBtn').onclick = () => {
+  const input = document.getElementById('linkOutput');
+  input.select();
+  navigator.clipboard.writeText(input.value);
+  toast('Link copied');
+};
+
+async function loadShares() {
+  const res = await fetch('/api/shares');
+  const shares = await res.json();
+  const tbody = document.getElementById('sharesTbody');
+  tbody.innerHTML = '';
+  for (const s of shares) {
+    const tr = document.createElement('tr');
+    const expires = s.expires_at ? new Date(s.expires_at * 1000).toLocaleString() : 'Never';
+    const downloads = s.download_count + (s.max_downloads ? ' / ' + s.max_downloads : '');
+    tr.innerHTML = `
+      <td>${escapeHtml(s.display_name)}${s.has_password ? ' 🔒' : ''}</td>
+      <td>${humanSize(s.size_bytes)}</td>
+      <td>${expires}</td>
+      <td>${downloads}</td>
+      <td><span class="badge ${s.status}">${s.status}</span></td>
+      <td class="actions">
+        <button class="secondary" data-copy="${s.id}">Copy link</button>
+        <button class="danger" data-revoke="${s.id}">Revoke</button>
+      </td>`;
+    tbody.appendChild(tr);
+  }
+  tbody.querySelectorAll('[data-copy]').forEach(b => b.onclick = () => {
+    navigator.clipboard.writeText(window.location.origin + '/download/' + b.dataset.copy);
+    toast('Link copied');
+  });
+  tbody.querySelectorAll('[data-revoke]').forEach(b => b.onclick = async () => {
+    await fetch('/api/shares/' + b.dataset.revoke + '/revoke', { method: 'POST' });
+    loadShares();
+  });
+}
+
+function escapeHtml(s) {
+  return s.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+document.getElementById('refreshBtn').onclick = loadShares;
+loadShares();
+setInterval(loadShares, 10000);
+</script>
+<script src="/app.js"></script>
+</body>
+</html>

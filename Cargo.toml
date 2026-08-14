@@ -1,0 +1,47 @@
+[package]
+name = "tempshare"
+version = "0.1.0"
+edition = "2021"
+description = "Self-hosted, local-first temporary file sharing server"
+
+[lib]
+name = "tempshare"
+path = "src/lib.rs"
+
+[[bin]]
+name = "tempshare"
+path = "src/main.rs"
+
+[dependencies]
+tokio = { version = "1", features = ["full"] }
+axum = { version = "0.7", features = ["multipart"] }
+axum-extra = { version = "0.9", features = ["typed-header"] }
+tower = { version = "0.4", features = ["util"] }
+tower-http = { version = "0.5", features = ["cors", "trace", "fs", "limit"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+r2d2 = "0.8"
+r2d2_sqlite = { version = "=0.22.0", features = ["bundled"] }
+
+rand = "0.8"
+base64 = "0.22"
+argon2 = "0.5"
+
+httpdate = "1.0"
+tokio-util = { version = "0.7", features = ["io"] }
+futures = "0.3"
+mime_guess = "2.0"
+zip = { version = "0.6", default-features = false, features = ["deflate"] }
+
+anyhow = "1"
+thiserror = "1"
+chrono = { version = "0.4", features = ["serde"] }
+dotenvy = "0.15"
+
+[dev-dependencies]
+tempfile = "3"
+http-body-util = "0.1"

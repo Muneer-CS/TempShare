@@ -1,0 +1,36 @@
+# Rust build output
+/target/
+
+# Runtime state and uploaded content
+/data/
+*.db
+*.db-wal
+*.db-shm
+*.log
+
+# Local configuration and secrets
+.env
+.env.*
+!.env.example
+
+# Release artifacts and bundled executables
+*.exe
+*.zip
+*.tar
+*.tar.gz
+*.7z
+
+# Editors and operating systems
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# Test and coverage artifacts
+coverage/
+*.profraw
+*.profdata
+

@@ -1,0 +1,15 @@
+target
+data
+.git
+.github
+.env
+.env.*
+!.env.example
+*.db
+*.db-wal
+*.db-shm
+*.log
+*.zip
+*.exe
+README.md
+
